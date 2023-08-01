@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>광주전남 실시간 강수량 지도</title>
+    <style>
+      #map {
+        width: 100%;
+        height: 500px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <!-- openlayers -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/css/ol.css" type="text/css">
+    <script src="https://cdn.jsdelivr.net/gh/openlayers/openlayers.github.io@master/en/v6.5.0/build/ol.js"></script>
+
+   // OpenLayers Map 객체 생성
+      var map = new ol.Map({
+        target: 'map',
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM(),
+          }),
+        ],
+        view: new ol.View({
+          center: ol.proj.fromLonLat([126.851914, 35.160132]), // 광주전남 지역 중심 좌표
+          zoom: 10, // 지도 초기 줌 레벨
+        }),
+      });
+
+      // 실시간 강수량 데이터를 가져와 지도에 표출하는 함수
+      function displayRainfallData() {
+        // 실시간 강수량 데이터를 제공하는 API의 URL
+        var url = 'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtFcst';
+        var params = {
+          serviceKey: 'yuCDXBWF0RrrNw%2BKXb3cg7O012vjvsdYj52giN0pnUqUFE9U9POSm2Krj1HpNqbRdG855lrFy7q4FfEWeTIgOA%3D%3D',
+          pageNo: 1,
+          numOfRows: 1000,
+          dataType: 'XML',
+          base_date: '20230718',
+          base_time: '0630',
+          nx: 59,
+          ny: 75
+        };
+
+        // AJAX 요청을 통해 실시간 강수량 데이터를 가져옴
+        $.ajax({
+          url: url,
+          data: params,
+          type: 'GET',
+          dataType: 'xml',
+          success: function (response) {
+            var rainfallData = $(response).find('item'); // 실시간 강수량 데이터
+
+            // 강수량 데이터를 반복하며 지도에 표출
+            rainfallData.each(function () {
+              var data = $(this);
+              var coordinate = ol.proj.fromLonLat([
+                Number(data.find('lon').text()),
+                Number(data.find('lat').text())
+              ]); // 데이터의 좌표
+              var rainfallValue = Number(data.find('rn1').text()); // 강수량 값
+
+              // 강수량에 따른 스타일 설정
+              var style = new ol.style.Style({
+                image: new ol.style.Circle({
+                  radius: rainfallValue * 100, // 강수량 값을 반지름으로 설정
+                  fill: new ol.style.Fill({
+                    color: 'blue', // 강수량 값에 따라 다른 색상으로 설정 가능
+                  }),
+                }),
+              });
+
+              // 지도에 포인트로 표출
+              var feature = new ol.Feature({
+                geometry: new ol.geom.Point(coordinate),
+              });
+              feature.setStyle(style);
+
+              var vectorSource = new ol.source.Vector({
+                features: [feature],
+              });
+
+              var vectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+              });
+
+              map.addLayer(vectorLayer);
+
+              // 위경도 마커 표시
+              var markerElement = document.createElement('div');
+              markerElement.className = 'marker';
+
+              var tooltipElement = document.createElement('div');
+              tooltipElement.className = 'tooltip';
+              tooltipElement.innerHTML = 'Rainfall: ' + rainfallValue + ' mm';
+              markerElement.appendChild(tooltipElement);
+
+              var marker = new ol.Overlay({
+                position: coordinate,
+                positioning: 'center-center',
+                element: markerElement,
+                stopEvent: false,
+              });
+
+              map.addOverlay(marker);
+            });
+          },
+          error: function () {
+            throw new Error('Error');
+          }
+        });
+      }
+
+      // 페이지 로드 시 실시간 강수량 데이터 표출
+      displayRainfallData();
+    </script>
+  </body>
+</html>
